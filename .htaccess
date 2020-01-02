@@ -1,0 +1,7 @@
+
+# Disable access to all file types
+Order deny,allow
+Deny from all
+
+# Disable directory browsing
+Options All -Indexes
