@@ -1,0 +1,20 @@
+{
+    "name": "q48academy/wp-gdpr-google-analytics",
+    "description": "A Wordpress plugin that implements the GDPR Privacy by design class and Concept",
+    "authors": [
+        {
+            "name": "Pascal Fantou",
+            "email": "wp-gdpr20@fantou.net",
+            "homepage": "https://q48.de",
+            "role": "Developer"
+        }
+    ],
+    "type": "wordpress-plugin",
+    "require-dev": {
+        "phpunit/phpunit": "^7"
+    },
+    "require": {
+        "q48academy/gdpr-privacy-by-design": "dev-master"
+    },
+    "license": "MIT"
+}

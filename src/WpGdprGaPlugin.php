@@ -4,7 +4,6 @@ use Q48academy\Gdpr\GdprGoogleAnalytics;
 
 class WpGdprGaPlugin
 {
-	const SLUG = 'wp-gdpr-ga';
 	const PAGE = 'wp-gdpr-ga';
 	const SETTING = 'wp-gdpr-ga-setting';
 	const SETTING_OPTIONS = 'wp_gdpr_ga_options';
@@ -121,8 +120,18 @@ class WpGdprGaPlugin
 		if(!empty($setupErrors)){
 			foreach($setupErrors as $msg => $msgType){
 				add_settings_error( 'wp_gdpr_ga_messages', 'wp_gdpr_ga_message', $msg, $msgType );
+				if(stripos($msg,'key') and 'error' == $msgType){
+					$keyError = true;
+                }
 			}
         }
+
+		if(!empty($_COOKIE[ GdprGoogleAnalytics::GDPR_BLOCK_COOKIE_NAME])){
+			$blockerCookie = true;
+		}else{
+			add_settings_error( 'wp_gdpr_ga_messages', 'wp_gdpr_ga_message', 'This Device is still tracked in GA. Do you really want this?', 'warning' );
+
+		}
 
 
 		// check if the user have submitted the settings
@@ -152,14 +161,21 @@ class WpGdprGaPlugin
 				?>
 			</form>
 
-           <?php if(!empty($setupErrors)): ?>
+           <?php if(!empty($keyError)): ?>
                 <form action="<?php echo admin_url('admin-post.php'); ?>" method="post">
                     <input type="hidden" name="action" value="wp_gdpr_install_keys">
 					<?php submit_button( 'Install Keys' ); ?>
                 </form>
            <?php endif; ?>
 
-        </div>
+			<?php if(empty($blockerCookie)): ?>
+				<form action="<?php echo admin_url('admin-post.php'); ?>" method="post">
+					<input type="hidden" name="action" value="wp_gdpr_set_blocker_cookie">
+					<?php submit_button( 'Set Cookie to ignore this Device' ); ?>
+				</form>
+			<?php endif; ?>
+
+		</div>
 		<?php
 	}
 
@@ -224,23 +240,23 @@ class WpGdprGaPlugin
 
 	public static function fieldGaId( $args ){
 
-		self::showTextField( $args ,self::SETTING_FIELD_GA_ID_DEFAULT , 'Put your GA ID here.');
+		self::showTextField( $args ,self::SETTING_FIELD_GA_ID , self::SETTING_FIELD_GA_ID_DEFAULT , 'Put your GA ID here.');
 
 	}
 
 	public static function fieldKeyDir( $args ){
 
-		self::showTextField( $args ,self::SETTING_FIELD_KEY_DIR_DEFAULT , 'Put your Key Dir here.');
+		self::showTextField( $args ,self::SETTING_FIELD_KEY_DIR , self::SETTING_FIELD_KEY_DIR_DEFAULT , 'Put your Key Dir here.');
 
 	}
 
 	public static function fieldLogDir( $args ){
 
-		self::showTextField( $args ,self::SETTING_FIELD_LOG_DIR_DEFAULT , 'Put your Log Dir here.');
+		self::showTextField( $args ,self::SETTING_FIELD_LOG_DIR , self::SETTING_FIELD_LOG_DIR_DEFAULT , 'Put your Log Dir here.');
 
 	}
 
-	private static function showTextField( $args , $field, $default){
+	private static function showTextField( $args , $field, $default , $descr){
 
 		// get the value of the setting we've registered with register_setting()
 		$options = get_option( self::SETTING_OPTIONS );
@@ -291,12 +307,30 @@ class WpGdprGaPlugin
 
 	}
 
+
+	///
+	/// Setup
+	///
 	public static function installKeys(){
 		$gdprGa = self::getGdprGa();
 		$gdprGa->generateKeys();
+
+		exit( wp_redirect( admin_url( 'tools.php?page=' . WpGdprGaPlugin::PAGE ) ) );
+
 	}
 
-    public static function trackPageImpression(){
+	public static function setBlockerCookie() {
+
+		$oneYear = time() + (86400*365);
+		setcookie( GdprGoogleAnalytics::GDPR_BLOCK_COOKIE_NAME , 'true', $oneYear , '/');
+		exit( wp_redirect( admin_url( 'tools.php?page=' . self::PAGE ) ) );
+
+	}
+
+	///
+	/// Track
+	///
+    public static function trackPageImpression( $measurementProtocolParameters = [] ){
 
 		$gaId = self::getGaId();
 		if (empty($gaId) or self::SETTING_FIELD_GA_ID_DEFAULT == $gaId){
@@ -311,14 +345,38 @@ class WpGdprGaPlugin
 
         }else{
 
+			$utm_parameters = [
+				'utm_source' => 'cs',
+				'utm_medium' => 'cm',
+				'utm_campaign' => 'cn',
+				'utm_term' => 'ck',
+				'utm_content' => 'cc',
+				'utm_id' => 'ci',
+#				'gclid' => 'gclid',
+#				'dclid' => 'dclid',
+			];
+
+			// @see https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters
 			$data = [
 				'tid' => $gaId,
 				'uip' => $gdprGa->getAnonIp(),
 				'ua' => $gdprGa->getAnonUserAgent(),
 				'dr' => $gdprGa->getAnonReferrer(),
-				'dl' => $gdprGa->getAnonDocumentLocationUrl(),
+				'dl' => $gdprGa->getAnonDocumentLocationUrl( ['whitelist' => array_keys($utm_parameters)] ),
 				'dt' => esc_html( get_the_title() ),
 			];
+
+
+			foreach($utm_parameters as $key => $param){
+
+				if(isset($_REQUEST[$key])){
+					$data[$param] = $_REQUEST[$key];
+				}
+
+			}
+
+			$data = array_merge( $measurementProtocolParameters , $data );
+
 
 			$result = $gdprGa->track( $data );
 			var_dump ($data);

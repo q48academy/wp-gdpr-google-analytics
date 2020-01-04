@@ -61,6 +61,12 @@ function deactivate_plugin_name()
 register_deactivation_hook(__FILE__, 'deactivate_plugin_name');
 */
 
+///
+/// testing
+///
+if( !function_exists('plugin_dir_path') ){ function plugin_dir_path( $str ){} }
+if( !function_exists('add_action') ){ function add_action( $str , $arr){} }
+
 /**
  * The core plugin class that is used to define internationalization,
  * admin-specific hooks, and public-facing site hooks.
@@ -96,16 +102,13 @@ add_action('admin_menu', ['WpGdprGaPlugin','optionsPage']);
  */
 add_action( 'admin_init', ['WpGdprGaPlugin','settingsInit'] );
 
-function wp_gdpr_install_keys() {
+add_action( 'admin_post_wp_gdpr_install_keys', ['WpGdprGaPlugin','installKeys'] );
+add_action( 'admin_post_wp_gdpr_set_blocker_cookie', ['WpGdprGaPlugin','setBlockerCookie'] );
 
-	WpGdprGaPlugin::installKeys();
 
-	exit( wp_redirect( admin_url( 'tools.php?page=' . WpGdprGaPlugin::PAGE ) ) );
-
-}
-
-add_action( 'admin_post_wp_gdpr_install_keys', 'wp_gdpr_install_keys' );
-
+///
+/// Public functions
+///
 function wp_gdpr_ga_track_pageview(){
 
 	WpGdprGaPlugin::trackPageImpression();
